@@ -1,11 +1,12 @@
-# Scalp Chart — US100 / US30
+# Scalp Chart — US100 / US30 / XAUUSD
 
 Realtime chart from 5-second bars up to daily. Read-only: never sends orders.
 
 **Online:** https://jerry4709.github.io/US100-TF/ — open in any browser, no install, no MT5.
 
 - KLineChart Pro UI: drawing tools, indicators, 5s · 10s · 15s · 30s · 1m · 3m · 5m · 15m · 30m · 1H · 4H · D
-- Side-by-side US100 / US30 compare
+- Side-by-side compare of any two symbols
+- 🎯 Buy/Sell plan tool (Entry → SL → TP, shows R:R). Drawing only, no orders
 - ICT Sessions & Killzones in New York time, DST-aware (edit `KZ` in `index.html`), killzone highs/lows extend until taken
 - Right-click menu, Alt+R resets the chart view
 - Drawings are remembered per symbol
@@ -14,7 +15,7 @@ Realtime chart from 5-second bars up to daily. Read-only: never sends orders.
 
 | Opened from | Prices | History | Drawings saved to |
 |---|---|---|---|
-| Anywhere (GitHub Pages) | US100: OKX Nasdaq-100 index. US30: Bitget `DIASTOCKUSDT` index x100 (DIA ETF) | 1m+ back months; US100 second TFs ~3 weeks (scroll left); US30 second TFs only from page open | your browser (localStorage) |
+| Anywhere (GitHub Pages) | US100, XAUUSD: OKX index (`US100-USDT`, `XAU-USD`). US30: Bitget `DIASTOCKUSDT` index x100 (DIA ETF) | 1m+ back months; US100/XAUUSD second TFs ~3 weeks (scroll left); US30 second TFs only from page open | your browser (localStorage) |
 | `start.bat` on a PC with MT5 | your broker's MT5 feed | ~1 month, incl. tick-built second bars | `drawings.json` |
 
 ### Local MT5 mode (Windows)

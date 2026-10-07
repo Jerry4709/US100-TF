@@ -6,7 +6,7 @@ import numpy as np
 import MetaTrader5 as mt5
 from websockets.asyncio.server import serve, broadcast
 
-SYMBOLS = ["NAS100Roll.PRO", "US30Roll.PRO"]  # names as shown in MT5 Market Watch
+SYMBOLS = ["NAS100Roll.PRO", "US30Roll.PRO", "XAUUSD.PRO"]  # names as shown in MT5 Market Watch
 SERVER_UTC_OFFSET_H = 0    # broker server time vs UTC (ACCM = 0, many brokers use 2 or 3)
 PORT = 8765
 OFFSET_MS = SERVER_UTC_OFFSET_H * 3600_000

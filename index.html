@@ -29,7 +29,8 @@
 <body>
 <div id="bar">
   <b>SCALP CHART</b>
-  <button id="btnCompare" title="เปิด US100 กับ US30 คู่กัน">⊞ เทียบ US100 / US30</button>
+  <button id="btnCompare" title="เปิด 2 กราฟคู่กัน เลือกสัญลักษณ์แต่ละฝั่งได้">⊞ เทียบ 2 กราฟ</button>
+  <button id="btnPlan" title="คลิก 3 จุดบนกราฟ: Entry → Stop Loss → Take Profit">🎯 วางแผน Buy/Sell</button>
   <button id="btnKZ" class="on" title="ICT Sessions & Killzones">ICT Killzones</button>
 </div>
 <div id="panes"><div class="pane" id="p0"></div><div class="pane" id="p1" hidden></div></div>
@@ -113,6 +114,29 @@ function kzDraw({ ctx, indicator, visibleRange, barSpace, xAxis, yAxis }) {
   ctx.setLineDash([]); ctx.globalAlpha = 1;
   return true;
 }
+// ---------- Buy/Sell plan (like TradingView Long/Short Position): click Entry -> Stop Loss -> Take Profit. Drawing only, no orders. ----------
+klinecharts.registerOverlay({
+  name: 'tradePlan', totalStep: 4, needDefaultPointFigure: true, needDefaultXAxisFigure: true, needDefaultYAxisFigure: true,
+  createPointFigures: ({ coordinates: c, overlay, precision }) => {
+    if (c.length < 2) return [];
+    const v = overlay.points.map(p => p.value), [e, s, t] = c, dp = precision.price;
+    const x = e.x, w = Math.max(120, ...c.map(p => p.x - x)), f = n => n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    const buy = t ? v[2] > v[0] : v[1] < v[0], risk = Math.abs(v[0] - v[1]), pct = d => (d / v[0] * 100).toFixed(2);
+    const zone = (y, color) => ({ type: 'rect', attrs: { x, y: Math.min(e.y, y), width: w, height: Math.abs(y - e.y) }, styles: { style: 'fill', color } });
+    const label = (y, text, bg, base) => ({ type: 'text', attrs: { x: x + 4, y, text, baseline: base }, styles: { color: '#fff', size: 12, backgroundColor: bg, paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, borderRadius: 2 } });
+    const figs = [zone(s.y, 'rgba(242,54,69,0.22)'), { type: 'line', attrs: { coordinates: [{ x, y: e.y }, { x: x + w, y: e.y }] }, styles: { color: '#d1d4dc' } }];
+    figs.push(label(s.y, `SL ${f(v[1])}  -${f(risk)} (${pct(risk)}%)`, '#f23645', s.y > e.y ? 'top' : 'bottom'));
+    let head = `${buy ? 'BUY' : 'SELL'} ${f(v[0])}`;
+    if (t) {
+      const reward = Math.abs(v[2] - v[0]), wrongSide = (v[1] < v[0]) !== buy;
+      figs.push(zone(t.y, 'rgba(8,153,129,0.22)'), label(t.y, `TP ${f(v[2])}  +${f(reward)} (${pct(reward)}%)`, '#089981', t.y < e.y ? 'bottom' : 'top'));
+      head += wrongSide ? '  ⚠ SL อยู่ฝั่งเดียวกับ TP' : `  R:R 1:${(reward / risk).toFixed(2)}`;
+    }
+    figs.push(label(e.y, head, buy ? '#2962ff' : '#e65100', 'middle'));
+    return figs;
+  },
+});
+
 klinecharts.registerIndicator({ name: 'ICT_KZ', shortName: 'ICT KZ', series: 'price', zLevel: -1, figures: [], calc: kzCalc, draw: kzDraw });
 
 // ---------- chart panes ----------
@@ -135,32 +159,61 @@ let reqId = 0;
 const ask = q => new Promise(res => { waiting[++reqId] = res; ws.send(JSON.stringify({ ...q, id: reqId })); });
 
 // ---------- public feeds (no key, CORS open) ----------
-// US100: OKX Nasdaq-100 index, has 1-second candles (~3 weeks back).
+// US100, XAUUSD: OKX index prices, with 1-second candles (~3 weeks back).
 // US30: Bitget index of the DIA ETF x100 (no free Dow source has second history, so its second TFs start at page open).
 const OKX = 'https://www.okx.com/api/v5/market/';
 const BG = 'https://api.bitget.com/api/v2/mix/market/';
+const OKX_IDS = { US100: 'US100-USDT', XAUUSD: 'XAU-USD' };
 const PUB = { US30: ['DIASTOCKUSDT', 100] };   // Bitget id, scale
 const OKX_TF = { 1e3: '1s', 6e4: '1m', 18e4: '3m', 3e5: '5m', 9e5: '15m', 18e5: '30m', 36e5: '1H', 144e5: '4H', 864e5: '1Dutc' };
 const BG_TF = { 6e4: '1m', 18e4: '3m', 3e5: '5m', 9e5: '15m', 18e5: '30m', 36e5: '1H', 144e5: '4H', 864e5: '1Dutc' };
 const getJSON = async url => (await fetch(url)).json();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function okxHistory(ms, to, n) {   // US100 bars ending before `to` (or now); second TFs are built from 1s candles
-  const step = ms < 6e4 ? 1e3 : ms, need = Math.min(n * ms / step, 2000), end = to ?? Date.now() + step, mark = Date.now();
-  const pages = Math.ceil(need / 100), url = after => `${OKX}history-index-candles?instId=US100-USDT&bar=${OKX_TF[step]}&after=${after}&limit=100`;
-  const rows = new Map();
-  for (let i = 0; i < pages; i += 10) {   // OKX allows ~10 of these calls per 2s
-    if (i) await sleep(2100);
-    const got = await Promise.all(Array.from({ length: Math.min(10, pages - i) }, (_, j) => getJSON(url(end - (i + j) * 100 * step))));
-    for (const d of got) for (const r of d.data || []) rows.set(+r[0], r);   // newest-first, pages may overlap across gaps
+let okxCalls = [];   // send times of recent OKX history calls: OKX allows ~10 per 2s per IP
+async function okxGet(url) {
+  for (;;) {
+    const now = Date.now();
+    okxCalls = okxCalls.filter(t => now - t < 2100);
+    if (okxCalls.length < 10) break;
+    await sleep(2100 - (now - okxCalls[0]));
   }
+  okxCalls.push(Date.now());
+  return getJSON(url);
+}
+
+async function okxRows(id, step, end, need) {   // `need` candles of `step` ms ending before `end`, as Map ts -> row
+  const url = after => `${OKX}history-index-candles?instId=${id}&bar=${OKX_TF[step]}&after=${after}&limit=100`;
+  const got = await Promise.all(Array.from({ length: Math.ceil(need / 100) }, (_, i) => okxGet(url(end - i * 100 * step))));
+  const rows = new Map();
+  for (const d of got) for (const r of d.data || []) rows.set(+r[0], r);   // newest-first, pages may overlap across gaps
+  return rows;
+}
+
+function rowsToBars(rows, ms) {
   const bars = [];
   for (const [t, r] of [...rows].sort((a, b) => a[0] - b[0])) {
     const ts = t - t % ms, b = bars.at(-1), [o, h, l, c] = r.slice(1, 5).map(Number);
     if (b && b[0] === ts) { b[2] = Math.max(b[2], h); b[3] = Math.min(b[3], l); b[4] = c; }
     else bars.push([ts, o, h, l, c, 0]);
   }
-  return { bars, mark };
+  return bars;
+}
+
+// Initial history is fetched once per symbol+TF and reused; second TFs all share one set of 1s candles, so switching is instant.
+// ponytail: cached bars + live ticks (kept 6h) bridge the gap; a TF left unopened for >6h would show a hole until reload
+const okxInit = {};
+const loadInit = (id, step) => okxInit[id + step] ??= (async () => {
+  const mark = Date.now();
+  return { rows: await okxRows(id, step, mark + step, step === 1e3 ? 3000 : 1000), mark };
+})();
+
+async function okxHistory(id, ms, to) {   // bars ending before `to` (or now)
+  const step = ms < 6e4 ? 1e3 : ms, c = await loadInit(id, step);
+  if (!to) return { bars: rowsToBars(c.rows, ms), mark: c.mark };   // live ticks after `mark` fill the rest
+  const older = await okxRows(id, step, to, 1000);
+  older.forEach((r, t) => c.rows.set(t, r));
+  return { bars: rowsToBars(older, ms), mark: c.mark };
 }
 
 function stream(url, subscribe, parse) {   // public websocket with keep-alive ping and auto-reconnect
@@ -177,7 +230,7 @@ function ticksToBars(list, ms) {   // build bars from recorded ticks with the sa
 }
 
 async function pubHistory(sym, ms, to, n) {
-  if (sym === 'US100') return okxHistory(ms, to, n);
+  if (OKX_IDS[sym]) return okxHistory(OKX_IDS[sym], ms, to);
   const [id, k] = PUB[sym], g = BG_TF[ms], mark = Date.now();
   // ponytail: no public tick history, so second TFs start from when the page was opened; a small recorder backend would fix it
   if (!g) return { bars: to ? [] : ticksToBars(recent[sym] || [], ms), mark: recent[sym]?.at(-1)?.[0] ?? 0 };
@@ -251,29 +304,42 @@ function feed(sub, t, p) {   // apply one live tick to the subscribed bar
   else sub.bar = { timestamp: ts, open: p, high: p, low: p, close: p, volume: 1 };   // volume = tick count
   sub.cb({ ...sub.bar });
 }
-const info = s => ({ ticker: s, name: s === 'US30' ? 'US30 (DIA ETF x100)' : s, shortName: s.replace(/Roll\.PRO$/, ''), pricePrecision: digits[s] ?? 2, volumePrecision: 0 });
+const info = s => ({ ticker: s, name: s === 'US30' ? 'US30 (DIA ETF x100)' : s, shortName: s.replace(/(Roll)?\.PRO$/, ''), pricePrecision: digits[s] ?? 2, volumePrecision: 0 });
 
 function makeDatafeed(pane) {
   const oldest = {};   // symbol+period -> timestamp of the oldest bar loaded
   let lastHist = null;
+  const live = h => {   // (re)start the live bar from the last history bar, replaying ticks that arrived meanwhile
+    const sub = pane.sub;
+    if (!sub) return;
+    sub.bar = h?.bar && { ...h.bar };
+    for (const [t, p] of recent[sub.sym] || []) if (t > (h?.mark ?? 0)) feed(sub, t, p);
+  };
   return {
     searchSymbols: async q => Object.keys(digits).filter(s => s.toLowerCase().includes((q || '').toLowerCase())).map(info),
     getHistoryKLineData: async (sym, period, _from, to) => {
       const key = sym.ticker + period.text, more = key in oldest && to <= oldest[key];   // scrolled left = load older
+      if (!more && pane.sym !== sym.ticker) { pane.sym = sym.ticker; loadDrawings(pane); }
       const q = { s: sym.ticker, ms: periodMs(period), to: more ? to : null, n: 1000 };
-      const r = MT5 ? await ask(q) : await pubHistory(q.s, q.ms, q.to, q.n);
-      const bars = r.bars.map(([timestamp, open, high, low, close, volume]) => ({ timestamp, open, high, low, close, volume }));
-      if (bars.length) oldest[key] = bars[0].timestamp;
-      if (!more) {
-        lastHist = { key, bar: bars.at(-1), mark: r.mark };
-        if (pane.sym !== sym.ticker) { pane.sym = sym.ticker; loadDrawings(pane); }
-      }
-      return bars;
+      const load = (MT5 ? ask(q) : pubHistory(q.s, q.ms, q.to, q.n)).then(r => {
+        const bars = r.bars.map(([timestamp, open, high, low, close, volume]) => ({ timestamp, open, high, low, close, volume }));
+        if (bars.length) oldest[key] = bars[0].timestamp;
+        if (!more) lastHist = { key, bar: bars.at(-1), mark: r.mark };
+        return bars;
+      });
+      // Pro stops reacting to symbol/TF clicks made while this promise is pending (it skips reading its signals while loading),
+      // so answer [] at once and put the bars on the chart ourselves when they land.
+      load.then(bars => setTimeout(() => {   // after Pro has applied our [] and subscribed (it does that in microtasks)
+        if (pane.pro.getSymbol().ticker !== sym.ticker || pane.pro.getPeriod().text !== period.text) return;   // user moved on
+        if (more) return pane.kc.applyMoreData(bars, bars.length > 0);
+        pane.kc.applyNewData(bars, bars.length > 0);
+        live(lastHist);
+      }));
+      return [];
     },
     subscribe: (sym, period, cb) => {
-      const h = lastHist?.key === sym.ticker + period.text ? lastHist : null;
-      pane.sub = { sym: sym.ticker, ms: periodMs(period), cb, bar: h?.bar && { ...h.bar } };
-      for (const [t, p] of recent[sym.ticker] || []) if (t > (h?.mark ?? 0)) feed(pane.sub, t, p);   // ticks that raced the history load
+      pane.sub = { sym: sym.ticker, ms: periodMs(period), cb, bar: null };
+      live(lastHist?.key === sym.ticker + period.text ? lastHist : null);
     },
     unsubscribe: () => { pane.sub = null; },
   };
@@ -348,6 +414,7 @@ btnCompare.onclick = () => {
   }
   dispatchEvent(new Event('resize'));   // Pro re-measures on window resize
 };
+document.getElementById('btnPlan').onclick = () => active?.kc.createOverlay({ name: 'tradePlan' });
 btnKZ.onclick = () => {
   kzOn = !kzOn;
   btnKZ.classList.toggle('on', kzOn);
@@ -376,11 +443,13 @@ if (MT5) {
   };
   ws.onclose = () => { document.title = 'DISCONNECTED - restart server.py and refresh'; };
 } else {
-  digits = { US100: 1, US30: 1 };
+  digits = { US100: 1, US30: 1, XAUUSD: 2 };
   try { drawings = JSON.parse(localStorage.getItem('drawings')) || {}; } catch {}
   start();
-  stream('wss://ws.okx.com:8443/ws/v5/public', { op: 'subscribe', args: [{ channel: 'index-tickers', instId: 'US100-USDT' }] },
-    m => m.data && onTicks('US100', m.data.map(d => [+d.ts, +d.idxPx])));
+  loadInit(OKX_IDS.US100, 1e3);   // prefetch second-TF data while the user looks at the big TF
+  const okxSym = Object.fromEntries(Object.entries(OKX_IDS).map(([s, id]) => [id, s]));
+  stream('wss://ws.okx.com:8443/ws/v5/public', { op: 'subscribe', args: Object.values(OKX_IDS).map(instId => ({ channel: 'index-tickers', instId })) },
+    m => m.data && okxSym[m.arg?.instId] && onTicks(okxSym[m.arg.instId], m.data.map(d => [+d.ts, +d.idxPx])));
   stream('wss://ws.bitget.com/v2/ws/public', { op: 'subscribe', args: [{ instType: 'USDT-FUTURES', channel: 'ticker', instId: PUB.US30[0] }] },
     m => m.data && onTicks('US30', m.data.map(d => [+d.ts, d.indexPrice * PUB.US30[1]])));
 }
