@@ -170,21 +170,25 @@ const BG_TF = { 6e4: '1m', 18e4: '3m', 3e5: '5m', 9e5: '15m', 18e5: '30m', 36e5:
 const getJSON = async url => (await fetch(url)).json();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-let okxCalls = [];   // send times of recent OKX history calls: OKX allows ~10 per 2s per IP
-async function okxGet(url) {
+// OKX rate limits are per endpoint (~20 calls / 2s each). The "recent" endpoint covers the newest ~1400 candles,
+// "history" everything older, so using both doubles throughput.
+const okxCalls = { 'index-candles': [], 'history-index-candles': [] };
+async function okxGet(path, query) {
   for (;;) {
-    const now = Date.now();
-    okxCalls = okxCalls.filter(t => now - t < 2100);
-    if (okxCalls.length < 10) break;
-    await sleep(2100 - (now - okxCalls[0]));
+    const now = Date.now(), q = okxCalls[path] = okxCalls[path].filter(t => now - t < 2100);
+    if (q.length < 18) break;
+    await sleep(2100 - (now - q[0]));
   }
-  okxCalls.push(Date.now());
-  return getJSON(url);
+  okxCalls[path].push(Date.now());
+  return getJSON(`${OKX}${path}?${query}`);
 }
 
 async function okxRows(id, step, end, need) {   // `need` candles of `step` ms ending before `end`, as Map ts -> row
-  const url = after => `${OKX}history-index-candles?instId=${id}&bar=${OKX_TF[step]}&after=${after}&limit=100`;
-  const got = await Promise.all(Array.from({ length: Math.ceil(need / 100) }, (_, i) => okxGet(url(end - i * 100 * step))));
+  const recentFrom = Date.now() - 1400 * step;
+  const got = await Promise.all(Array.from({ length: Math.ceil(need / 100) }, (_, i) => {
+    const after = end - i * 100 * step;
+    return okxGet(after - 100 * step > recentFrom ? 'index-candles' : 'history-index-candles', `instId=${id}&bar=${OKX_TF[step]}&after=${after}&limit=100`);
+  }));
   const rows = new Map();
   for (const d of got) for (const r of d.data || []) rows.set(+r[0], r);   // newest-first, pages may overlap across gaps
   return rows;
@@ -230,7 +234,11 @@ function ticksToBars(list, ms) {   // build bars from recorded ticks with the sa
 }
 
 async function pubHistory(sym, ms, to, n) {
-  if (OKX_IDS[sym]) return okxHistory(OKX_IDS[sym], ms, to);
+  if (OKX_IDS[sym]) {   // after this symbol's first load, prefetch its 1s candles so drilling down to second TFs is instant
+    const r = okxHistory(OKX_IDS[sym], ms, to);
+    r.then(() => loadInit(OKX_IDS[sym], 1e3));
+    return r;
+  }
   const [id, k] = PUB[sym], g = BG_TF[ms], mark = Date.now();
   // ponytail: no public tick history, so second TFs start from when the page was opened; a small recorder backend would fix it
   if (!g) return { bars: to ? [] : ticksToBars(recent[sym] || [], ms), mark: recent[sym]?.at(-1)?.[0] ?? 0 };
@@ -446,7 +454,6 @@ if (MT5) {
   digits = { US100: 1, US30: 1, XAUUSD: 2 };
   try { drawings = JSON.parse(localStorage.getItem('drawings')) || {}; } catch {}
   start();
-  loadInit(OKX_IDS.US100, 1e3);   // prefetch second-TF data while the user looks at the big TF
   const okxSym = Object.fromEntries(Object.entries(OKX_IDS).map(([s, id]) => [id, s]));
   stream('wss://ws.okx.com:8443/ws/v5/public', { op: 'subscribe', args: Object.values(OKX_IDS).map(instId => ({ channel: 'index-tickers', instId })) },
     m => m.data && okxSym[m.arg?.instId] && onTicks(okxSym[m.arg.instId], m.data.map(d => [+d.ts, +d.idxPx])));
