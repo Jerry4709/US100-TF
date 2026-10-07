@@ -120,10 +120,54 @@ const panes = [];    // { el, pro, kc, sym, sub, ids }
 const recent = {};   // symbol -> last few minutes of live ticks [[utcMs, price], ...]
 let digits = {}, offset = 0, drawings = {}, kzOn = true, active = null;
 
-const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host || 'localhost:8765'}/${location.search}`);   // keeps ?key= when online
+// Data source: served by server.py (port 8765) -> MT5 on this PC. Anywhere else (GitHub Pages, file) -> public Bitget index prices.
+const MT5 = location.port === '8765';
+const ws = MT5 ? new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/${location.search}`) : null;
 const waiting = {};
 let reqId = 0;
 const ask = q => new Promise(res => { waiting[++reqId] = res; ws.send(JSON.stringify({ ...q, id: reqId })); });
+
+// ---------- public feed: Bitget index price (no key, CORS open). US30 tracks the DIA ETF, so it is shown x100. ----------
+const BG = 'https://api.bitget.com/api/v2/mix/market/';
+const PUB = { US100: ['NDX100USDT', 1], US30: ['DIASTOCKUSDT', 100] };
+const BG_TF = { 6e4: '1m', 18e4: '3m', 3e5: '5m', 9e5: '15m', 18e5: '30m', 36e5: '1H', 144e5: '4H', 864e5: '1Dutc' };
+const getJSON = async url => (await fetch(url)).json();
+
+function ticksToBars(list, ms) {   // build bars from recorded ticks with the same logic as live updates
+  const out = [], sub = { ms, bar: null, cb: b => out.at(-1)?.timestamp === b.timestamp ? (out[out.length - 1] = b) : out.push(b) };
+  for (const [t, p] of list) feed(sub, t, p);
+  return out.map(b => [b.timestamp, b.open, b.high, b.low, b.close, b.volume]);
+}
+
+async function pubHistory(sym, ms, to, n) {
+  const [id, k] = PUB[sym], g = BG_TF[ms], mark = Date.now();
+  // ponytail: no public tick history, so second TFs start from when the page was opened; a small recorder backend would fix it
+  if (!g) return { bars: to ? [] : ticksToBars(recent[sym] || [], ms), mark: recent[sym]?.at(-1)?.[0] ?? 0 };
+  const q = `symbol=${id}&productType=USDT-FUTURES&granularity=${g}`;
+  let rows = [];
+  if (!to) rows = (await getJSON(`${BG}candles?${q}&kLineType=index&limit=1000`)).data || [];   // includes the forming bar
+  else for (let end = to; rows.length < n; ) {   // older bars, 200 per call, endTime is exclusive
+    const d = (await getJSON(`${BG}history-index-candles?${q}&endTime=${end}&limit=200`)).data || [];
+    if (!d.length) break;
+    rows = d.concat(rows);
+    end = +d[0][0];
+  }
+  return { bars: rows.map(r => [+r[0], r[1] * k, r[2] * k, r[3] * k, r[4] * k, 0]), mark };
+}
+
+function bitgetLive() {
+  const sock = new WebSocket('wss://ws.bitget.com/v2/ws/public');
+  const byId = Object.fromEntries(Object.entries(PUB).map(([s, [id, k]]) => [id, [s, k]]));
+  const ping = setInterval(() => sock.readyState === 1 && sock.send('ping'), 25e3);
+  sock.onopen = () => sock.send(JSON.stringify({ op: 'subscribe',
+    args: Object.keys(byId).map(instId => ({ instType: 'USDT-FUTURES', channel: 'ticker', instId })) }));
+  sock.onmessage = e => {
+    if (e.data === 'pong') return;
+    const m = JSON.parse(e.data), hit = byId[m.arg?.instId];
+    if (m.data && hit) onTicks(hit[0], m.data.map(d => [+d.ts, d.indexPrice * hit[1]]));
+  };
+  sock.onclose = () => { clearInterval(ping); setTimeout(bitgetLive, 2000); };   // reconnect
+}
 
 // Pro hides its klinecharts instance; grab it at init to add seconds labels, drawing persistence and our indicator.
 const kInit = klinecharts.init;
@@ -161,7 +205,8 @@ function saveDrawings(pane) {
     .map(({ name, groupId, lock, visible, mode, styles, extendData, points }) =>
       ({ name, groupId, lock, visible, mode, styles, extendData, points: points.map(({ timestamp, value }) => ({ timestamp, value })) }));
   drawings[pane.sym] = list;
-  ws.send(JSON.stringify({ op: 'save', s: pane.sym, overlays: list }));
+  if (MT5) ws.send(JSON.stringify({ op: 'save', s: pane.sym, overlays: list }));
+  else try { localStorage.setItem('drawings', JSON.stringify(drawings)); } catch {}   // online: each visitor keeps their own drawings
   panes.filter(p => p !== pane && p.sym === pane.sym && p.kc).forEach(loadDrawings);   // same symbol open in the other pane
 }
 
@@ -181,7 +226,7 @@ function feed(sub, t, p) {   // apply one live tick to the subscribed bar
   else sub.bar = { timestamp: ts, open: p, high: p, low: p, close: p, volume: 1 };   // volume = tick count
   sub.cb({ ...sub.bar });
 }
-const info = s => ({ ticker: s, name: s, shortName: s.replace(/Roll\.PRO$/, ''), pricePrecision: digits[s] ?? 2, volumePrecision: 0 });
+const info = s => ({ ticker: s, name: s === 'US30' ? 'US30 (DIA ETF x100)' : s, shortName: s.replace(/Roll\.PRO$/, ''), pricePrecision: digits[s] ?? 2, volumePrecision: 0 });
 
 function makeDatafeed(pane) {
   const oldest = {};   // symbol+period -> timestamp of the oldest bar loaded
@@ -190,7 +235,8 @@ function makeDatafeed(pane) {
     searchSymbols: async q => Object.keys(digits).filter(s => s.toLowerCase().includes((q || '').toLowerCase())).map(info),
     getHistoryKLineData: async (sym, period, _from, to) => {
       const key = sym.ticker + period.text, more = key in oldest && to <= oldest[key];   // scrolled left = load older
-      const r = await ask({ s: sym.ticker, ms: periodMs(period), to: more ? to : null, n: 1000 });
+      const q = { s: sym.ticker, ms: periodMs(period), to: more ? to : null, n: 1000 };
+      const r = MT5 ? await ask(q) : await pubHistory(q.s, q.ms, q.to, q.n);
       const bars = r.bars.map(([timestamp, open, high, low, close, volume]) => ({ timestamp, open, high, low, close, volume }));
       if (bars.length) oldest[key] = bars[0].timestamp;
       if (!more) {
@@ -214,7 +260,7 @@ function openPane(el, symbol, period) {
   pane.pro = new klinechartspro.KLineChartPro({
     container: el, theme: 'dark', locale: 'en-US', timezone: 'Asia/Bangkok', watermark: '',
     symbol: info(symbol), period, periods: PERIODS,
-    mainIndicators: ['EMA'], subIndicators: ['VOL'],
+    mainIndicators: ['EMA'], subIndicators: MT5 ? ['VOL'] : [],   // index prices have no volume
     datafeed: makeDatafeed(pane),
   });
   el.addEventListener('mousedown', () => active = pane);
@@ -284,23 +330,32 @@ btnKZ.onclick = () => {
 };
 
 // ---------- live data ----------
-ws.onmessage = e => {
-  const m = JSON.parse(e.data);
-  if (m.id) { waiting[m.id](m); delete waiting[m.id]; return; }
-  if (m.hello) {
-    digits = m.digits; offset = m.offset; drawings = m.drawings || {};
-    if (!panes.length) openPane(document.getElementById('p0'), Object.keys(digits)[0], PERIODS[9]);   // open on 1H, drill down from there
-    return;
-  }
-  const list = recent[m.s] ??= [], last = list.at(-1)?.[0] ?? 0;
-  for (const [t, p] of m.ticks) {
+function onTicks(s, ticks) {
+  const list = recent[s] ??= [], last = list.at(-1)?.[0] ?? 0;
+  for (const [t, p] of ticks) {
     if (t <= last) continue;
     list.push([t, p]);
-    for (const pane of panes) if (pane.sub?.sym === m.s) feed(pane.sub, t, p);
+    for (const pane of panes) if (pane.sub?.sym === s) feed(pane.sub, t, p);
   }
-  while (list.length && list[0][0] < last - 120e3) list.shift();   // keep ~2 minutes
-};
-ws.onclose = () => { document.title = 'DISCONNECTED - restart server.py and refresh'; };
+  const keep = MT5 ? 120e3 : 6 * 36e5;   // online: ticks are the only source for second TFs, keep 6 hours
+  while (list.length && list[0][0] < last - keep) list.shift();
+}
+const start = () => { if (!panes.length) openPane(document.getElementById('p0'), Object.keys(digits)[0], PERIODS[9]); };   // open on 1H, drill down from there
+
+if (MT5) {
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.id) { waiting[m.id](m); delete waiting[m.id]; return; }
+    if (m.hello) { digits = m.digits; offset = m.offset; drawings = m.drawings || {}; start(); return; }
+    onTicks(m.s, m.ticks);
+  };
+  ws.onclose = () => { document.title = 'DISCONNECTED - restart server.py and refresh'; };
+} else {
+  digits = { US100: 1, US30: 1 };
+  try { drawings = JSON.parse(localStorage.getItem('drawings')) || {}; } catch {}
+  start();
+  bitgetLive();
+}
 </script>
 </body>
 </html>
