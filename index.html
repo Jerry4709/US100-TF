@@ -1,0 +1,306 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scalp Chart</title>
+<link rel="icon" href="data:image/png;base64,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">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@klinecharts/pro@0.1.1/dist/klinecharts-pro.css">
+<script src="https://cdn.jsdelivr.net/npm/klinecharts@9.8.12/dist/umd/klinecharts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@klinecharts/pro@0.1.1/dist/klinecharts-pro.umd.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #151517; color: #d1d4dc; font: 13px system-ui, sans-serif; overflow: hidden; }
+  #bar { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 1px solid #2a2e39; }
+  #bar b { margin-right: auto; letter-spacing: .5px; }
+  #bar button { background: #1e222d; color: #d1d4dc; border: 1px solid #363a45; border-radius: 4px; padding: 4px 10px; cursor: pointer; font: inherit; }
+  #bar button.on { background: #2962ff; border-color: #2962ff; color: #fff; }
+  #panes { height: calc(100% - 33px); display: flex; }
+  .pane { flex: 1; min-width: 0; min-height: 0; position: relative; }
+  #panes > .pane.klinecharts-pro { height: auto; }   /* Pro's css fixes a height; let flex fill the screen instead */
+  .pane + .pane { border-left: 2px solid #2a2e39; }
+  @media (max-width: 800px) { #panes { flex-direction: column; } .pane + .pane { border-left: 0; border-top: 2px solid #2a2e39; } }
+  #menu { position: fixed; z-index: 99; min-width: 260px; background: #1e222d; border: 1px solid #363a45; border-radius: 6px; padding: 4px 0; box-shadow: 0 8px 24px #0008; }
+  #menu div { display: flex; justify-content: space-between; gap: 24px; padding: 8px 14px; cursor: pointer; }
+  #menu div:hover { background: #2a2e39; }
+  #menu kbd { color: #787b86; font: inherit; }
+  #menu hr { border: 0; border-top: 1px solid #363a45; margin: 4px 0; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <b>SCALP CHART</b>
+  <button id="btnCompare" title="เปิด US100 กับ US30 คู่กัน">⊞ เทียบ US100 / US30</button>
+  <button id="btnKZ" class="on" title="ICT Sessions & Killzones">ICT Killzones</button>
+</div>
+<div id="panes"><div class="pane" id="p0"></div><div class="pane" id="p1" hidden></div></div>
+<div id="menu" hidden></div>
+<script>
+// ---------- ICT Sessions & Killzones (times are UTC, same as the TradingView indicator settings) ----------
+const KZ = [
+  { name: 'Asia',     from: '01:00', to: '08:00', color: '#ff9800', box: true },
+  { name: 'Asia KZ',  from: '01:00', to: '05:00', color: '#ff9800' },
+  { name: 'London',   from: '09:00', to: '14:30', color: '#00e676', box: true },
+  { name: 'LOKZ',     from: '08:00', to: '11:00', color: '#00e676' },
+  { name: 'LOCKZ',    from: '16:00', to: '18:00', color: '#00e676' },
+  { name: 'New York', from: '14:30', to: '22:00', color: '#aa00ff', box: true },
+  { name: 'NYKZ',     from: '13:00', to: '16:00', color: '#aa00ff' },
+  { name: 'SYSNY',    from: '22:00', to: '02:00', color: '#00bcd4', box: true },
+];
+const KZ_MAX_TF_MIN = 45;   // hide killzones above this timeframe
+const toMin = s => +s.slice(0, 2) * 60 + +s.slice(3);
+KZ.forEach(z => { z.f = toMin(z.from); z.t = toMin(z.to); });
+const inZone = (m, z) => z.f < z.t ? m >= z.f && m < z.t : m >= z.f || m < z.t;   // handles sessions crossing midnight
+
+function kzCalc(list) {
+  const res = list.map(() => ({}));
+  res.zones = [];
+  let tf = Infinity;
+  for (let i = 1; i < Math.min(list.length, 50); i++) tf = Math.min(tf, list[i].timestamp - list[i - 1].timestamp);
+  if (tf > KZ_MAX_TF_MIN * 6e4) return res;
+  const open = {};
+  list.forEach((k, i) => {
+    const d = new Date(k.timestamp), m = d.getUTCHours() * 60 + d.getUTCMinutes();
+    for (const z of KZ) {
+      let c = open[z.name];
+      if (!inZone(m, z)) { open[z.name] = null; continue; }
+      if (!c || k.timestamp - c.lastTs > 6 * 36e5) {
+        c = open[z.name] = { z, start: i, end: i, high: k.high, low: k.low, lastTs: k.timestamp };
+        res.zones.push(c);
+      } else { c.end = i; c.high = Math.max(c.high, k.high); c.low = Math.min(c.low, k.low); c.lastTs = k.timestamp; }
+    }
+  });
+  // killzone high/low extend right until price trades through them (liquidity taken)
+  for (const c of res.zones) {
+    if (c.z.box) continue;
+    c.hiEnd = c.loEnd = list.length - 1; c.hiHit = c.loHit = false;
+    for (let j = c.end + 1; j < list.length && !(c.hiHit && c.loHit); j++) {
+      if (!c.hiHit && list[j].high > c.high) { c.hiEnd = j; c.hiHit = true; }
+      if (!c.loHit && list[j].low < c.low) { c.loEnd = j; c.loHit = true; }
+    }
+  }
+  return res;
+}
+
+function kzDraw({ ctx, indicator, visibleRange, barSpace, xAxis, yAxis }) {
+  const zones = indicator.result.zones || [], half = barSpace.bar / 2, fmt = v => v.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const X = i => xAxis.convertToPixel(i), Y = v => yAxis.convertToPixel(v);
+  ctx.font = '11px system-ui, sans-serif';
+  for (const c of zones) {
+    const last = c.z.box ? c.end : Math.max(c.hiEnd, c.loEnd);
+    if (last < visibleRange.from - 1 || c.start > visibleRange.to + 1) continue;
+    const x1 = X(c.start) - half, x2 = X(c.end) + half, yH = Y(c.high), yL = Y(c.low);
+    ctx.strokeStyle = ctx.fillStyle = c.z.color;
+    if (c.z.box) {
+      ctx.globalAlpha = 0.18; ctx.fillRect(x1, yH, x2 - x1, yL - yH);
+      ctx.globalAlpha = 1; ctx.fillText(c.z.name, x1, yH - 5);
+      continue;
+    }
+    ctx.globalAlpha = 0.9; ctx.lineWidth = 1;
+    for (const [y, end, hit, tag, v] of [[yH, c.hiEnd, c.hiHit, 'H', c.high], [yL, c.loEnd, c.loHit, 'L', c.low]]) {
+      ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+      const xe = X(end);
+      ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(x2, y); ctx.lineTo(xe, y); ctx.stroke();
+      if (!hit) ctx.fillText(`${c.z.name} ${tag} ${fmt(v)}`, xe + 4, y + (tag === 'H' ? -3 : 11));   // label only untaken liquidity
+    }
+  }
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+  return true;
+}
+klinecharts.registerIndicator({ name: 'ICT_KZ', shortName: 'ICT KZ', series: 'price', zLevel: -1, figures: [], calc: kzCalc, draw: kzDraw });
+
+// ---------- chart panes ----------
+const UNIT = { second: 1e3, minute: 6e4, hour: 36e5, day: 864e5 };
+const AXIS_FMT = { second: 'HH:mm:ss', minute: 'HH:mm', hour: 'MM-DD HH:mm', day: 'YYYY-MM-DD' };
+const periodMs = p => p.multiplier * UNIT[p.timespan];
+const PERIODS = [[5, 'second', '5s'], [10, 'second', '10s'], [15, 'second', '15s'], [30, 'second', '30s'],
+  [1, 'minute', '1m'], [3, 'minute', '3m'], [5, 'minute', '5m'], [15, 'minute', '15m'], [30, 'minute', '30m'],
+  [1, 'hour', '1H'], [4, 'hour', '4H'], [1, 'day', 'D']].map(([multiplier, timespan, text]) => ({ multiplier, timespan, text }));
+
+const panes = [];    // { el, pro, kc, sym, sub, ids }
+const recent = {};   // symbol -> last few minutes of live ticks [[utcMs, price], ...]
+let digits = {}, offset = 0, drawings = {}, kzOn = true, active = null;
+
+const ws = new WebSocket(`ws://${location.host || 'localhost:8765'}`);
+const waiting = {};
+let reqId = 0;
+const ask = q => new Promise(res => { waiting[++reqId] = res; ws.send(JSON.stringify({ ...q, id: reqId })); });
+
+// Pro hides its klinecharts instance; grab it at init to add seconds labels, drawing persistence and our indicator.
+const kInit = klinecharts.init;
+klinecharts.init = (dom, opts) => {
+  const pane = panes.find(p => p.el.contains(dom));
+  const kc = kInit(dom, { ...opts, customApi: {
+    formatDate: (dtf, ts, _fmt, type) => klinecharts.utils.formatDate(dtf, ts,
+      type === klinecharts.FormatDateType.XAxis ? AXIS_FMT[pane.pro?.getPeriod().timespan] ?? 'HH:mm' : 'YYYY-MM-DD HH:mm:ss')
+  }});
+  pane.kc = kc;
+  hookDrawings(pane);
+  if (kzOn) setTimeout(() => kc.createIndicator('ICT_KZ', true, { id: 'candle_pane' }));
+  return kc;
+};
+
+// ---------- drawings: saved to the server (drawings.json) per symbol ----------
+function hookDrawings(pane) {
+  const { kc } = pane, create = kc.createOverlay.bind(kc), override = kc.overrideOverlay.bind(kc);
+  let timer;
+  const save = () => { if (!pane.loading) { clearTimeout(timer); timer = setTimeout(() => saveDrawings(pane), 300); } };
+  const after = (fn, extra) => e => { const r = fn?.(e); extra?.(e); save(); return r; };
+  kc.createOverlay = (value, paneId) => {
+    const list = [].concat(value).map(o => typeof o === 'string' ? { name: o } : o).map(o => ({ ...o,
+      onDrawEnd: after(o.onDrawEnd), onPressedMoveEnd: after(o.onPressedMoveEnd),
+      onRemoved: after(o.onRemoved, e => pane.ids.delete(e.overlay.id)) }));
+    const ids = create(list, paneId);
+    ids.forEach(id => id && pane.ids.add(id));
+    return Array.isArray(value) ? ids : ids[0];
+  };
+  kc.overrideOverlay = o => { override(o); save(); };
+}
+
+function saveDrawings(pane) {
+  const list = [...pane.ids].map(id => pane.kc.getOverlayById(id)).filter(o => o && !o.isDrawing())
+    .map(({ name, groupId, lock, visible, mode, styles, extendData, points }) =>
+      ({ name, groupId, lock, visible, mode, styles, extendData, points: points.map(({ timestamp, value }) => ({ timestamp, value })) }));
+  drawings[pane.sym] = list;
+  ws.send(JSON.stringify({ op: 'save', s: pane.sym, overlays: list }));
+  panes.filter(p => p !== pane && p.sym === pane.sym && p.kc).forEach(loadDrawings);   // same symbol open in the other pane
+}
+
+function loadDrawings(pane) {
+  pane.loading = true;
+  [...pane.ids].forEach(id => pane.kc.removeOverlay(id));
+  pane.ids.clear();
+  for (const o of drawings[pane.sym] || []) pane.kc.createOverlay(structuredClone(o));
+  pane.loading = false;
+}
+
+// ---------- datafeed (one per pane) ----------
+function feed(sub, t, p) {   // apply one live tick to the subscribed bar
+  const ts = t - (t + offset) % sub.ms, b = sub.bar;   // align buckets to broker server time, like MT5 bars
+  if (b && ts < b.timestamp) return;
+  if (b && ts === b.timestamp) { b.high = Math.max(b.high, p); b.low = Math.min(b.low, p); b.close = p; b.volume++; }
+  else sub.bar = { timestamp: ts, open: p, high: p, low: p, close: p, volume: 1 };   // volume = tick count
+  sub.cb({ ...sub.bar });
+}
+const info = s => ({ ticker: s, name: s, shortName: s.replace(/Roll\.PRO$/, ''), pricePrecision: digits[s] ?? 2, volumePrecision: 0 });
+
+function makeDatafeed(pane) {
+  const oldest = {};   // symbol+period -> timestamp of the oldest bar loaded
+  let lastHist = null;
+  return {
+    searchSymbols: async q => Object.keys(digits).filter(s => s.toLowerCase().includes((q || '').toLowerCase())).map(info),
+    getHistoryKLineData: async (sym, period, _from, to) => {
+      const key = sym.ticker + period.text, more = key in oldest && to <= oldest[key];   // scrolled left = load older
+      const r = await ask({ s: sym.ticker, ms: periodMs(period), to: more ? to : null, n: 1000 });
+      const bars = r.bars.map(([timestamp, open, high, low, close, volume]) => ({ timestamp, open, high, low, close, volume }));
+      if (bars.length) oldest[key] = bars[0].timestamp;
+      if (!more) {
+        lastHist = { key, bar: bars.at(-1), mark: r.mark };
+        if (pane.sym !== sym.ticker) { pane.sym = sym.ticker; loadDrawings(pane); }
+      }
+      return bars;
+    },
+    subscribe: (sym, period, cb) => {
+      const h = lastHist?.key === sym.ticker + period.text ? lastHist : null;
+      pane.sub = { sym: sym.ticker, ms: periodMs(period), cb, bar: h?.bar && { ...h.bar } };
+      for (const [t, p] of recent[sym.ticker] || []) if (t > (h?.mark ?? 0)) feed(pane.sub, t, p);   // ticks that raced the history load
+    },
+    unsubscribe: () => { pane.sub = null; },
+  };
+}
+
+function openPane(el, symbol, period) {
+  const pane = { el, ids: new Set() };
+  panes.push(pane);
+  pane.pro = new klinechartspro.KLineChartPro({
+    container: el, theme: 'dark', locale: 'en-US', timezone: 'Asia/Bangkok', watermark: '',
+    symbol: info(symbol), period, periods: PERIODS,
+    mainIndicators: ['EMA'], subIndicators: ['VOL'],
+    datafeed: makeDatafeed(pane),
+  });
+  el.addEventListener('mousedown', () => active = pane);
+  el.addEventListener('mouseenter', () => active = pane);
+  el.addEventListener('contextmenu', e => showMenu(e, pane));
+  active ??= pane;
+  return pane;
+}
+
+// ---------- reset view (Alt+R) + right-click menu ----------
+function resetView(pane) {
+  const kc = pane?.kc;
+  if (!kc) return;
+  kc.getDrawPaneById('candle_pane')?.getAxisComponent().setAutoCalcTickFlag(true);   // undo manual price-axis zoom
+  kc.setBarSpace(8);                                                                  // klinecharts default bar width
+  kc.scrollToRealTime();
+  kc.adjustPaneViewport(false, true, true, true);
+}
+
+const menu = document.getElementById('menu');
+function showMenu(e, pane) {
+  e.preventDefault();
+  active = pane;
+  const main = pane.kc.getDom('candle_pane', 'main')?.getBoundingClientRect();
+  const inCandle = main && e.clientY >= main.top && e.clientY <= main.bottom;
+  const price = inCandle ? pane.kc.convertFromPixel([{ x: e.clientX - main.left, y: e.clientY - main.top }], { paneId: 'candle_pane' })[0]?.value : null;
+  const txt = price != null ? price.toFixed(digits[pane.sym] ?? 2) : null;
+  const items = [
+    ['↺ ปรับมุมมองชาร์ตใหม่', 'Alt + R', () => resetView(pane)],
+    txt && ['คัดลอกราคา ' + Number(txt).toLocaleString('en-US', { minimumFractionDigits: digits[pane.sym] ?? 2 }), '', () => navigator.clipboard.writeText(txt)],
+    '-',
+    ['ลบเส้นที่วาดทั้งหมด', '', () => { if (confirm(`ลบเส้นทั้งหมดของ ${info(pane.sym).shortName}?`)) [...pane.ids].forEach(id => pane.kc.removeOverlay(id)); }],
+  ].filter(Boolean);
+  menu.replaceChildren(...items.map(it => {
+    if (it === '-') return document.createElement('hr');
+    const d = document.createElement('div');
+    d.innerHTML = `<span></span><kbd>${it[1]}</kbd>`;
+    d.firstChild.textContent = it[0];
+    d.onclick = () => { menu.hidden = true; it[2](); };
+    return d;
+  }));
+  menu.hidden = false;
+  menu.style.left = Math.min(e.clientX, innerWidth - menu.offsetWidth - 4) + 'px';
+  menu.style.top = Math.min(e.clientY, innerHeight - menu.offsetHeight - 4) + 'px';
+}
+addEventListener('mousedown', e => { if (!menu.contains(e.target)) menu.hidden = true; });
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') menu.hidden = true;
+  if (e.altKey && e.code === 'KeyR') { e.preventDefault(); resetView(active); }
+});
+
+// ---------- toolbar ----------
+const p1 = document.getElementById('p1'), btnCompare = document.getElementById('btnCompare'), btnKZ = document.getElementById('btnKZ');
+btnCompare.onclick = () => {
+  p1.hidden = !p1.hidden;
+  btnCompare.classList.toggle('on', !p1.hidden);
+  if (!p1.hidden && panes.length < 2) {
+    const first = panes[0], other = Object.keys(digits).find(s => s !== first.sym) ?? first.sym;
+    openPane(p1, other, first.pro.getPeriod());
+  }
+  dispatchEvent(new Event('resize'));   // Pro re-measures on window resize
+};
+btnKZ.onclick = () => {
+  kzOn = !kzOn;
+  btnKZ.classList.toggle('on', kzOn);
+  for (const p of panes) kzOn ? p.kc.createIndicator('ICT_KZ', true, { id: 'candle_pane' }) : p.kc.removeIndicator('candle_pane', 'ICT_KZ');
+};
+
+// ---------- live data ----------
+ws.onmessage = e => {
+  const m = JSON.parse(e.data);
+  if (m.id) { waiting[m.id](m); delete waiting[m.id]; return; }
+  if (m.hello) {
+    digits = m.digits; offset = m.offset; drawings = m.drawings || {};
+    if (!panes.length) openPane(document.getElementById('p0'), Object.keys(digits)[0], PERIODS[9]);   // open on 1H, drill down from there
+    return;
+  }
+  const list = recent[m.s] ??= [], last = list.at(-1)?.[0] ?? 0;
+  for (const [t, p] of m.ticks) {
+    if (t <= last) continue;
+    list.push([t, p]);
+    for (const pane of panes) if (pane.sub?.sym === m.s) feed(pane.sub, t, p);
+  }
+  while (list.length && list[0][0] < last - 120e3) list.shift();   // keep ~2 minutes
+};
+ws.onclose = () => { document.title = 'DISCONNECTED - restart server.py and refresh'; };
+</script>
+</body>
+</html>
