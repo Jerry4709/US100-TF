@@ -122,7 +122,7 @@ let digits = {}, offset = 0, drawings = {}, kzOn = true, active = null;
 
 // Data source: served by server.py (port 8765) -> MT5 on this PC. Anywhere else (GitHub Pages, file) -> public Bitget index prices.
 const MT5 = location.port === '8765';
-const ws = MT5 ? new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/${location.search}`) : null;
+const ws = MT5 ? new WebSocket(`ws://${location.host}`) : null;
 const waiting = {};
 let reqId = 0;
 const ask = q => new Promise(res => { waiting[++reqId] = res; ws.send(JSON.stringify({ ...q, id: reqId })); });

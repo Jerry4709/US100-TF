@@ -1,8 +1,7 @@
 # MT5 -> WebSocket bridge + serves index.html.  Run: python server.py  (opens http://localhost:8765)
 # Read-only: only reads prices from MT5, never sends orders.
-import asyncio, hmac, json, os, secrets, time, webbrowser
+import asyncio, json, os, time, webbrowser
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
 import numpy as np
 import MetaTrader5 as mt5
 from websockets.asyncio.server import serve, broadcast
@@ -12,10 +11,6 @@ SERVER_UTC_OFFSET_H = 0    # broker server time vs UTC (ACCM = 0, many brokers u
 PORT = 8765
 OFFSET_MS = SERVER_UTC_OFFSET_H * 3600_000
 
-# Visitors coming through a tunnel/proxy (online) must add ?key=<access_key.txt>; localhost needs no key.
-KEY_FILE = Path(__file__).parent / "access_key.txt"
-ACCESS_KEY = KEY_FILE.read_text().strip() if KEY_FILE.exists() else secrets.token_urlsafe(12)
-KEY_FILE.write_text(ACCESS_KEY)
 RATES_TF = {60_000: mt5.TIMEFRAME_M1, 180_000: mt5.TIMEFRAME_M3, 300_000: mt5.TIMEFRAME_M5,
             900_000: mt5.TIMEFRAME_M15, 1_800_000: mt5.TIMEFRAME_M30,
             3_600_000: mt5.TIMEFRAME_H1, 14_400_000: mt5.TIMEFRAME_H4, 86_400_000: mt5.TIMEFRAME_D1}
@@ -112,10 +107,6 @@ async def pump():
         await asyncio.sleep(0.1)
 
 def http(conn, req):
-    proxied = any(h in req.headers for h in ("Cf-Connecting-Ip", "X-Forwarded-For"))
-    key = parse_qs(urlsplit(req.path).query).get("key", [""])[0]
-    if proxied and not hmac.compare_digest(key, ACCESS_KEY):
-        return conn.respond(403, "Forbidden: open the link with ?key=... (see access_key.txt)\n")
     if req.headers.get("Upgrade", "").lower() != "websocket":
         r = conn.respond(200, (Path(__file__).parent / "index.html").read_text(encoding="utf-8"))
         del r.headers["Content-Type"]
@@ -125,7 +116,6 @@ def http(conn, req):
 async def main():
     async with serve(handler, "localhost", PORT, process_request=http):
         print(f"open http://localhost:{PORT}  (Ctrl+C to stop)")
-        print(f"online link: <your tunnel URL>/?key={ACCESS_KEY}")
         webbrowser.open(f"http://localhost:{PORT}")
         await pump()
 
