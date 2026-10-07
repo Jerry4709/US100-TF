@@ -30,7 +30,6 @@
 <div id="bar">
   <b>SCALP CHART</b>
   <button id="btnCompare" title="เปิด 2 กราฟคู่กัน เลือกสัญลักษณ์แต่ละฝั่งได้">⊞ เทียบ 2 กราฟ</button>
-  <button id="btnPlan" title="คลิก 3 จุดบนกราฟ: Entry → Stop Loss → Take Profit">🎯 วางแผน Buy/Sell</button>
   <button id="btnKZ" class="on" title="ICT Sessions & Killzones">ICT Killzones</button>
 </div>
 <div id="panes"><div class="pane" id="p0"></div><div class="pane" id="p1" hidden></div></div>
@@ -114,13 +113,13 @@ function kzDraw({ ctx, indicator, visibleRange, barSpace, xAxis, yAxis }) {
   ctx.setLineDash([]); ctx.globalAlpha = 1;
   return true;
 }
-// ---------- Buy/Sell plan (like TradingView Long/Short Position): click Entry -> Stop Loss -> Take Profit. Drawing only, no orders. ----------
+// ---------- Long/Short position (like TradingView): points are Entry, Stop Loss, Take Profit. Drawing only, no orders. ----------
 klinecharts.registerOverlay({
   name: 'tradePlan', totalStep: 4, needDefaultPointFigure: true, needDefaultXAxisFigure: true, needDefaultYAxisFigure: true,
   createPointFigures: ({ coordinates: c, overlay, precision }) => {
     if (c.length < 2) return [];
     const v = overlay.points.map(p => p.value), [e, s, t] = c, dp = precision.price;
-    const x = e.x, w = Math.max(120, ...c.map(p => p.x - x)), f = n => n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    const x = e.x, w = Math.max(160, ...c.map(p => p.x - x)), f = n => n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
     const buy = t ? v[2] > v[0] : v[1] < v[0], risk = Math.abs(v[0] - v[1]), pct = d => (d / v[0] * 100).toFixed(2);
     const zone = (y, color) => ({ type: 'rect', attrs: { x, y: Math.min(e.y, y), width: w, height: Math.abs(y - e.y) }, styles: { style: 'fill', color } });
     const label = (y, text, bg, base) => ({ type: 'text', attrs: { x: x + 4, y, text, baseline: base }, styles: { color: '#fff', size: 12, backgroundColor: bg, paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, borderRadius: 2 } });
@@ -362,11 +361,40 @@ function openPane(el, symbol, period) {
     mainIndicators: ['EMA'], subIndicators: MT5 ? ['VOL'] : [],   // index prices have no volume
     datafeed: makeDatafeed(pane),
   });
+  addPositionTools(pane);
   el.addEventListener('mousedown', () => active = pane);
   el.addEventListener('mouseenter', () => active = pane);
   el.addEventListener('contextmenu', e => showMenu(e, pane));
   active ??= pane;
   return pane;
+}
+
+// Long / Short tools in Pro's left drawing bar: pick one, click the chart once, then drag Entry/SL/TP to adjust.
+const posIcon = buy => `<svg class="icon-overlay" viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="7" rx="1" fill="${buy ? '#089981' : '#f23645'}" opacity=".7"/>
+  <rect x="3" y="12" width="16" height="7" rx="1" fill="${buy ? '#f23645' : '#089981'}" opacity=".7"/><path d="M3 11h16" stroke="currentColor"/></svg>`;
+function addPositionTools(pane) {
+  const bar = pane.el.querySelector('.klinecharts-pro-drawing-bar'), split = bar?.querySelector('.split-line');
+  if (!split) return;
+  for (const buy of [true, false]) {
+    const it = document.createElement('div');
+    it.className = 'item';
+    it.title = buy ? 'สถานะ Long (Buy): คลิกบนกราฟเพื่อวาง' : 'สถานะ Short (Sell): คลิกบนกราฟเพื่อวาง';
+    it.innerHTML = `<span style="width:32px;height:32px">${posIcon(buy)}</span>`;
+    it.onclick = () => { pane.placing = buy; pane.el.style.cursor = 'crosshair'; };
+    bar.insertBefore(it, split);
+  }
+  pane.el.addEventListener('click', e => {
+    if (pane.placing === undefined) return;
+    const main = pane.kc.getDom('candle_pane', 'main')?.getBoundingClientRect();
+    if (!main || e.clientX < main.left || e.clientX > main.right || e.clientY < main.top || e.clientY > main.bottom) return;
+    const buy = pane.placing, x = e.clientX - main.left, y = e.clientY - main.top, dl = pane.kc.getDataList();
+    pane.placing = undefined; pane.el.style.cursor = '';
+    const at = py => pane.kc.convertFromPixel([{ x, y: py }], { paneId: 'candle_pane' })[0];
+    const entry = at(y), ts = entry.timestamp ?? dl[entry.dataIndex]?.timestamp ?? dl.at(-1).timestamp;
+    const sl = at(buy ? y + 40 : y - 40).value, tp = at(buy ? y - 80 : y + 80).value;   // default R:R 1:2
+    pane.kc.createOverlay({ name: 'tradePlan', points: [entry.value, sl, tp].map(value => ({ timestamp: ts, value })) });
+    saveDrawings(pane);   // created with all points, so no draw-end event fires
+  }, true);
 }
 
 // ---------- reset view (Alt+R) + right-click menu ----------
@@ -407,7 +435,7 @@ function showMenu(e, pane) {
 }
 addEventListener('mousedown', e => { if (!menu.contains(e.target)) menu.hidden = true; });
 addEventListener('keydown', e => {
-  if (e.key === 'Escape') menu.hidden = true;
+  if (e.key === 'Escape') { menu.hidden = true; panes.forEach(p => { p.placing = undefined; p.el.style.cursor = ''; }); }
   if (e.altKey && e.code === 'KeyR') { e.preventDefault(); resetView(active); }
 });
 
@@ -422,7 +450,6 @@ btnCompare.onclick = () => {
   }
   dispatchEvent(new Event('resize'));   // Pro re-measures on window resize
 };
-document.getElementById('btnPlan').onclick = () => active?.kc.createOverlay({ name: 'tradePlan' });
 btnKZ.onclick = () => {
   kzOn = !kzOn;
   btnKZ.classList.toggle('on', kzOn);

@@ -6,7 +6,7 @@ Realtime chart from 5-second bars up to daily. Read-only: never sends orders.
 
 - KLineChart Pro UI: drawing tools, indicators, 5s · 10s · 15s · 30s · 1m · 3m · 5m · 15m · 30m · 1H · 4H · D
 - Side-by-side compare of any two symbols
-- 🎯 Buy/Sell plan tool (Entry → SL → TP, shows R:R). Drawing only, no orders
+- Long / Short position tools in the left drawing bar: click once, drag Entry/SL/TP, shows R:R. Drawing only, no orders
 - ICT Sessions & Killzones in New York time, DST-aware (edit `KZ` in `index.html`), killzone highs/lows extend until taken
 - Right-click menu, Alt+R resets the chart view
 - Drawings are remembered per symbol
