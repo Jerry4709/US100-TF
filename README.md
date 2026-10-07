@@ -14,3 +14,15 @@ Realtime chart for second timeframes (5s–30s) up to D, fed by MetaTrader 5. Re
 1. Open MT5 and log in. Symbol names and broker UTC offset are at the top of `server.py`.
 2. `pip install MetaTrader5 websockets numpy`
 3. Double-click `start.bat` (opens http://localhost:8765)
+
+## Online (free, your PC stays the server)
+
+MT5 runs on your PC, so the app is published with a tunnel instead of a cloud host:
+
+```
+winget install Cloudflare.cloudflared
+cloudflared tunnel --url http://localhost:8765
+```
+
+Open `https://<printed>.trycloudflare.com/?key=<contents of access_key.txt>`. Requests through the tunnel
+without the key get 403. The quick-tunnel URL changes each run; a fixed URL needs a free Cloudflare account + domain.

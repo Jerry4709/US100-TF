@@ -120,7 +120,7 @@ const panes = [];    // { el, pro, kc, sym, sub, ids }
 const recent = {};   // symbol -> last few minutes of live ticks [[utcMs, price], ...]
 let digits = {}, offset = 0, drawings = {}, kzOn = true, active = null;
 
-const ws = new WebSocket(`ws://${location.host || 'localhost:8765'}`);
+const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host || 'localhost:8765'}/${location.search}`);   // keeps ?key= when online
 const waiting = {};
 let reqId = 0;
 const ask = q => new Promise(res => { waiting[++reqId] = res; ws.send(JSON.stringify({ ...q, id: reqId })); });
