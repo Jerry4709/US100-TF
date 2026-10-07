@@ -35,17 +35,24 @@
 <div id="panes"><div class="pane" id="p0"></div><div class="pane" id="p1" hidden></div></div>
 <div id="menu" hidden></div>
 <script>
-// ---------- ICT Sessions & Killzones (times are UTC, same as the TradingView indicator settings) ----------
+// ---------- ICT Sessions & Killzones, in New York time so US daylight saving is handled (NY open 09:30 = 20:30 Bangkok in summer, 21:30 in winter) ----------
 const KZ = [
-  { name: 'Asia',     from: '01:00', to: '08:00', color: '#ff9800', box: true },
-  { name: 'Asia KZ',  from: '01:00', to: '05:00', color: '#ff9800' },
-  { name: 'London',   from: '09:00', to: '14:30', color: '#00e676', box: true },
-  { name: 'LOKZ',     from: '08:00', to: '11:00', color: '#00e676' },
-  { name: 'LOCKZ',    from: '16:00', to: '18:00', color: '#00e676' },
-  { name: 'New York', from: '14:30', to: '22:00', color: '#aa00ff', box: true },
-  { name: 'NYKZ',     from: '13:00', to: '16:00', color: '#aa00ff' },
-  { name: 'SYSNY',    from: '22:00', to: '02:00', color: '#00bcd4', box: true },
+  { name: 'Asia',     from: '20:00', to: '03:00', color: '#ff9800', box: true },
+  { name: 'Asia KZ',  from: '20:00', to: '00:00', color: '#ff9800' },
+  { name: 'London',   from: '04:00', to: '09:30', color: '#00e676', box: true },
+  { name: 'LOKZ',     from: '03:00', to: '06:00', color: '#00e676' },
+  { name: 'LOCKZ',    from: '11:00', to: '13:00', color: '#00e676' },
+  { name: 'New York', from: '09:30', to: '17:00', color: '#aa00ff', box: true },
+  { name: 'NYKZ',     from: '08:00', to: '11:00', color: '#aa00ff' },
+  { name: 'SYSNY',    from: '17:00', to: '21:00', color: '#00bcd4', box: true },
 ];
+const nyFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
+const nyOff = new Map();   // UTC hour -> New York offset in minutes (cached, Intl is slow)
+function nyMinutes(ts) {   // minutes since New York midnight
+  const h = Math.floor(ts / 36e5);
+  if (!nyOff.has(h)) { const [hh, mm] = nyFmt.format(h * 36e5).split(':').map(Number); nyOff.set(h, hh * 60 + mm - (h % 24) * 60); }
+  return ((Math.floor(ts / 6e4) % 1440 + nyOff.get(h)) % 1440 + 1440) % 1440;
+}
 const KZ_MAX_TF_MIN = 45;   // hide killzones above this timeframe
 const toMin = s => +s.slice(0, 2) * 60 + +s.slice(3);
 KZ.forEach(z => { z.f = toMin(z.from); z.t = toMin(z.to); });
@@ -59,7 +66,7 @@ function kzCalc(list) {
   if (tf > KZ_MAX_TF_MIN * 6e4) return res;
   const open = {};
   list.forEach((k, i) => {
-    const d = new Date(k.timestamp), m = d.getUTCHours() * 60 + d.getUTCMinutes();
+    const m = nyMinutes(k.timestamp);
     for (const z of KZ) {
       let c = open[z.name];
       if (!inZone(m, z)) { open[z.name] = null; continue; }
@@ -127,11 +134,41 @@ const waiting = {};
 let reqId = 0;
 const ask = q => new Promise(res => { waiting[++reqId] = res; ws.send(JSON.stringify({ ...q, id: reqId })); });
 
-// ---------- public feed: Bitget index price (no key, CORS open). US30 tracks the DIA ETF, so it is shown x100. ----------
+// ---------- public feeds (no key, CORS open) ----------
+// US100: OKX Nasdaq-100 index, has 1-second candles (~3 weeks back).
+// US30: Bitget index of the DIA ETF x100 (no free Dow source has second history, so its second TFs start at page open).
+const OKX = 'https://www.okx.com/api/v5/market/';
 const BG = 'https://api.bitget.com/api/v2/mix/market/';
-const PUB = { US100: ['NDX100USDT', 1], US30: ['DIASTOCKUSDT', 100] };
+const PUB = { US30: ['DIASTOCKUSDT', 100] };   // Bitget id, scale
+const OKX_TF = { 1e3: '1s', 6e4: '1m', 18e4: '3m', 3e5: '5m', 9e5: '15m', 18e5: '30m', 36e5: '1H', 144e5: '4H', 864e5: '1Dutc' };
 const BG_TF = { 6e4: '1m', 18e4: '3m', 3e5: '5m', 9e5: '15m', 18e5: '30m', 36e5: '1H', 144e5: '4H', 864e5: '1Dutc' };
 const getJSON = async url => (await fetch(url)).json();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function okxHistory(ms, to, n) {   // US100 bars ending before `to` (or now); second TFs are built from 1s candles
+  const step = ms < 6e4 ? 1e3 : ms, need = Math.min(n * ms / step, 2000), end = to ?? Date.now() + step, mark = Date.now();
+  const pages = Math.ceil(need / 100), url = after => `${OKX}history-index-candles?instId=US100-USDT&bar=${OKX_TF[step]}&after=${after}&limit=100`;
+  const rows = new Map();
+  for (let i = 0; i < pages; i += 10) {   // OKX allows ~10 of these calls per 2s
+    if (i) await sleep(2100);
+    const got = await Promise.all(Array.from({ length: Math.min(10, pages - i) }, (_, j) => getJSON(url(end - (i + j) * 100 * step))));
+    for (const d of got) for (const r of d.data || []) rows.set(+r[0], r);   // newest-first, pages may overlap across gaps
+  }
+  const bars = [];
+  for (const [t, r] of [...rows].sort((a, b) => a[0] - b[0])) {
+    const ts = t - t % ms, b = bars.at(-1), [o, h, l, c] = r.slice(1, 5).map(Number);
+    if (b && b[0] === ts) { b[2] = Math.max(b[2], h); b[3] = Math.min(b[3], l); b[4] = c; }
+    else bars.push([ts, o, h, l, c, 0]);
+  }
+  return { bars, mark };
+}
+
+function stream(url, subscribe, parse) {   // public websocket with keep-alive ping and auto-reconnect
+  const sock = new WebSocket(url), ping = setInterval(() => sock.readyState === 1 && sock.send('ping'), 25e3);
+  sock.onopen = () => sock.send(JSON.stringify(subscribe));
+  sock.onmessage = e => { if (e.data !== 'pong') parse(JSON.parse(e.data)); };
+  sock.onclose = () => { clearInterval(ping); setTimeout(() => stream(url, subscribe, parse), 2000); };
+}
 
 function ticksToBars(list, ms) {   // build bars from recorded ticks with the same logic as live updates
   const out = [], sub = { ms, bar: null, cb: b => out.at(-1)?.timestamp === b.timestamp ? (out[out.length - 1] = b) : out.push(b) };
@@ -140,6 +177,7 @@ function ticksToBars(list, ms) {   // build bars from recorded ticks with the sa
 }
 
 async function pubHistory(sym, ms, to, n) {
+  if (sym === 'US100') return okxHistory(ms, to, n);
   const [id, k] = PUB[sym], g = BG_TF[ms], mark = Date.now();
   // ponytail: no public tick history, so second TFs start from when the page was opened; a small recorder backend would fix it
   if (!g) return { bars: to ? [] : ticksToBars(recent[sym] || [], ms), mark: recent[sym]?.at(-1)?.[0] ?? 0 };
@@ -155,19 +193,6 @@ async function pubHistory(sym, ms, to, n) {
   return { bars: rows.map(r => [+r[0], r[1] * k, r[2] * k, r[3] * k, r[4] * k, 0]), mark };
 }
 
-function bitgetLive() {
-  const sock = new WebSocket('wss://ws.bitget.com/v2/ws/public');
-  const byId = Object.fromEntries(Object.entries(PUB).map(([s, [id, k]]) => [id, [s, k]]));
-  const ping = setInterval(() => sock.readyState === 1 && sock.send('ping'), 25e3);
-  sock.onopen = () => sock.send(JSON.stringify({ op: 'subscribe',
-    args: Object.keys(byId).map(instId => ({ instType: 'USDT-FUTURES', channel: 'ticker', instId })) }));
-  sock.onmessage = e => {
-    if (e.data === 'pong') return;
-    const m = JSON.parse(e.data), hit = byId[m.arg?.instId];
-    if (m.data && hit) onTicks(hit[0], m.data.map(d => [+d.ts, d.indexPrice * hit[1]]));
-  };
-  sock.onclose = () => { clearInterval(ping); setTimeout(bitgetLive, 2000); };   // reconnect
-}
 
 // Pro hides its klinecharts instance; grab it at init to add seconds labels, drawing persistence and our indicator.
 const kInit = klinecharts.init;
@@ -354,7 +379,10 @@ if (MT5) {
   digits = { US100: 1, US30: 1 };
   try { drawings = JSON.parse(localStorage.getItem('drawings')) || {}; } catch {}
   start();
-  bitgetLive();
+  stream('wss://ws.okx.com:8443/ws/v5/public', { op: 'subscribe', args: [{ channel: 'index-tickers', instId: 'US100-USDT' }] },
+    m => m.data && onTicks('US100', m.data.map(d => [+d.ts, +d.idxPx])));
+  stream('wss://ws.bitget.com/v2/ws/public', { op: 'subscribe', args: [{ instType: 'USDT-FUTURES', channel: 'ticker', instId: PUB.US30[0] }] },
+    m => m.data && onTicks('US30', m.data.map(d => [+d.ts, d.indexPrice * PUB.US30[1]])));
 }
 </script>
 </body>
